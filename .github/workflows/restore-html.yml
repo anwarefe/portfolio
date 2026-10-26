@@ -1,0 +1,44 @@
+name: Restore valid portfolio HTML
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/restore-html.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix markup and commit
+        shell: bash
+        run: |
+          python3 -c '
+          import re
+          from pathlib import Path
+          path = Path("index.html")
+          s = path.read_text(encoding="utf-8")
+          lt = chr(60)
+          if not s.lstrip().startswith(lt):
+              T = "(?:html|head|meta|title|style|body|header|footer|main|div|section|nav|h1|h2|h3|article|span|small|em|strong|p|b|a|label|aside|br|link|button|i)"
+              lb = "(?" + lt + "![\\w./#-])"
+              s = re.sub(r"!doctype\s+html>", "__DT__", s, flags=re.I)
+              s = re.sub(r"/"+T+r">",lambda m:lt+m.group(),s,flags=re.I)
+              A = r"\s+(?:class|id|lang|dir|href|rel|name|content|charset|type|property|target|aria-label|aria-labelledby|role|src|style|aria-hidden)\s*=\s*[^>]*>"
+              s = re.sub(lb+T+A,lambda m:lt+m.group(),s,flags=re.I)
+              s = re.sub(lb+T+r">",lambda m:lt+m.group(),s,flags=re.I)
+              s = s.replace("br>",lt+"br>").replace(lt+lt+"br>",lt+"br>")
+              s = s.replace("__DT__",lt+"!doctype html>")
+              path.write_text(s,encoding="utf-8")
+              print("Restored markup:",len(s))
+          else:
+              print("Markup already present")
+          '
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Restore valid portfolio HTML"
+            git push
+          fi
