@@ -1,0 +1,53 @@
+name: Finalize portfolio markup
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/finalize-markup.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct GitHub editor markup damage
+        shell: bash
+        run: |
+          python3 -c '
+          from pathlib import Path
+          p = Path("index.html")
+          s = p.read_text(encoding="utf-8")
+          lt = chr(60)
+          t = lambda x: lt+x
+          fixes = [
+              ("DOCTYPE "+t("html>"),t("!doctype html>")),
+              (t("/head>")+t("/body>")+"\n"+t("/header>")+t("div"),t("/head>")+t("body>")+"\n"+t("header>")+t("div")),
+              ("\n"+t("/main>")+t("div class=\"hero\""),"\n"+t("main>")+t("div class=\"hero\"")),
+              ("\n"+t("/section>")+t("section id=\"expertise\""),"\n"+t("section id=\"expertise\"")),
+              ("\n"+t("/section>")+t("section class=\"dark\""),"\n"+t("section class=\"dark\"")),
+              ("\n"+t("/section>")+t("section id=\"about\""),"\n"+t("section id=\"about\"")),
+              ("\n"+t("/section>")+t("section class=\"contact\""),"\n"+t("section class=\"contact\"")),
+              ("\n"+t("/footer>")+t("div"),"\n"+t("footer>")+t("div")),
+              (t("h1>Mohamedbr")+t("/em>Anwar.")+t("/h1>"),t("h1>Mohamed")+t("br>")+t("em>Anwar.")+t("/em>")+t("/h1>")),
+              ("AI and language.br/Judgment","AI and language."+t("br>")+"Judgment"),
+              ("Stories behindbr/the headlines.","Stories behind"+t("br>")+"the headlines.")
+          ]
+          for old,new in fixes:
+              assert s.count(old)==1,("missing or repeated",old,s.count(old))
+              s=s.replace(old,new,1)
+          assert s.count("\n/article class=")==7
+          s=s.replace("\n/article class=","\n"+t("article class="))
+          assert s.startswith(t("!doctype html>"))
+          assert s.count(lt)==s.count(">")
+          assert "Mohamed"+t("br>")+t("em>") in s
+          p.write_text(s,encoding="utf-8")
+          print("Final HTML markup verified:",len(s))
+          '
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Finalize valid portfolio markup"
+            git push
+          fi
